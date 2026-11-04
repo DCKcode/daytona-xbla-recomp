@@ -153,3 +153,10 @@ target_link_libraries(daytona_native_frame PRIVATE daytona_native_renderer)
 add_executable(daytona_native_capture EXCLUDE_FROM_ALL ../tools/native_capture.cpp src/native_frame_builder.cpp)
 target_include_directories(daytona_native_capture PRIVATE "${REXGLUE_SDK_SOURCE_DIR}/thirdparty/glslang")
 target_link_libraries(daytona_native_capture PRIVATE daytona_native_renderer daytona_guest_gpu xxHash::xxhash)
+
+add_executable(daytona_native_tests EXCLUDE_FROM_ALL tests/native_frame_builder_test.cpp src/native_frame_builder.cpp)
+target_include_directories(daytona_native_tests PRIVATE "${REXGLUE_SDK_SOURCE_DIR}/thirdparty/glslang")
+target_link_libraries(daytona_native_tests PRIVATE daytona_native_renderer daytona_guest_gpu xxHash::xxhash)
+enable_testing()
+add_test(NAME daytona_native_builder
+    COMMAND daytona_native_tests "${CMAKE_CURRENT_BINARY_DIR}/native-test-frame.bin")
