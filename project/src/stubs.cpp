@@ -14,7 +14,7 @@
 #include <cstdlib>
 #include <stdexcept>
 
-REXCVAR_DECLARE(bool, daytona_native_renderer);
+REXCVAR_DECLARE(bool, rexglue_renderer);
 
 // Return a zero result from a stub (r3 = 0)
 #define DT_STUB_RETURN(name, val) \
@@ -272,7 +272,7 @@ REX_HOOK_RAW(sub_82233C80) {
 
     __imp__sub_82233C80(ctx, base);
 
-    if (REXCVAR_GET(daytona_native_renderer)) {
+    if (!REXCVAR_GET(rexglue_renderer)) {
         // The guest retires frame buffers on vblank. Own their contents before
         // returning to the CPU code that can reuse them for the next frame.
         PPCContext flush = ctx;
@@ -768,7 +768,7 @@ REX_HOOK_RAW(SceneRender) {
 REX_HOOK_RAW(sub_8212B0A8) {
     const uint32_t target = ctx.r4.u32;
     __imp__sub_8212B0A8(ctx, base);
-    if (!REXCVAR_GET(daytona_native_renderer) ||
+    if (REXCVAR_GET(rexglue_renderer) ||
         !target ||
         REX_LOAD_U32(target + 176) == 1)
         return;

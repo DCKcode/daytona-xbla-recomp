@@ -19,8 +19,8 @@
 #include <thread>
 #include <xxhash.h>
 
-REXCVAR_DEFINE_BOOL(daytona_native_renderer, false, "GPU",
-                    "Render Daytona with native Vulkan targets.");
+REXCVAR_DEFINE_BOOL(rexglue_renderer, false, "GPU",
+                    "Use the ReXGlue renderer for reference comparisons.");
 REXCVAR_DEFINE_BOOL(daytona_native_profile, false, "Diagnostics",
                     "Log native frame CPU and queue timings.");
 REXCVAR_DEFINE_UINT64(daytona_native_cpu_mask, 0, "GPU",
@@ -349,7 +349,7 @@ class NativeGraphicsSystem final : public gpu::vulkan::VulkanGraphicsSystem {
 };
 } // namespace
 std::unique_ptr<rex::system::IGraphicsSystem> CreateDaytonaNativeGraphics() {
-  if (!REXCVAR_GET(daytona_native_renderer))
+  if (REXCVAR_GET(rexglue_renderer))
     return nullptr;
   return std::make_unique<NativeGraphicsSystem>();
 }
