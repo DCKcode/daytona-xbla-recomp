@@ -4,11 +4,11 @@
 #include "daytona_init.h"
 #include "daytona_debug.h"
 #include "keyboard_driver.h"
+#include "render_probe.h"
 
 #include <rex/cvar.h>
 #include <rex/filesystem.h>
 #include <rex/graphics/flags.h>
-#include <rex/graphics/vulkan/graphics_system.h>
 #include <rex/logging/api.h>
 #include <rex/rex_app.h>
 #include <rex/input/input_system.h>
@@ -411,7 +411,7 @@ protected:
     }
 
     void OnPreSetup(rex::RuntimeConfig& config) override {
-        config.graphics = std::make_unique<rex::graphics::vulkan::VulkanGraphicsSystem>();
+        config.graphics = CreateDaytonaSdkGraphics();
         daytona_debug::SetStage(daytona_debug::AppStage::kPreSetup);
         REXCVAR_SET(gpu_allow_invalid_fetch_constants, true);
 
@@ -432,6 +432,7 @@ protected:
         auto kbd = std::make_unique<KeyboardInputDriver>(window());
         kbd->Setup();
         input_sys->AddDriver(std::move(kbd));
+        InstallDaytonaProbeInput(*input_sys);
     }
 
     void OnPreLaunchModule() override {

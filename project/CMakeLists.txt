@@ -52,6 +52,7 @@ add_executable(daytona
     src/stubs.cpp
     src/keyboard_driver.cpp
     src/daytona_debug.cpp
+    src/render_probe.cpp
     ${GENERATED_SOURCES}
 )
 
