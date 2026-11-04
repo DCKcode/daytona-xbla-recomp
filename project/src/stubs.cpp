@@ -4,11 +4,17 @@
 #include "daytona_init.h"
 #include "daytona_debug.h"
 #include "daytona_symbols.h"
+#include "native_graphics.h"
+#include "native_renderer.h"
+#include <rex/cvar.h>
 #include <rex/hook.h>
 #include <rex/logging.h>
 #include <rex/system/xtypes.h>
 #include <cstdio>
 #include <cstdlib>
+#include <stdexcept>
+
+REXCVAR_DECLARE(bool, daytona_native_renderer);
 
 // Return a zero result from a stub (r3 = 0)
 #define DT_STUB_RETURN(name, val) \
@@ -248,6 +254,7 @@ REX_HOOK_RAW(sub_822337C0) {
 DT_TRACE_HOOK(sub_82235B20, daytona_debug::HookId::kCommandFlush)  // CommandFlush
 DT_TRACE_HOOK(sub_82235D58, daytona_debug::HookId::kCommandAlloc)  // CommandAlloc
 REX_HOOK_RAW(sub_82233C80) {
+    const uint32_t device = ctx.r3.u32;
     uint32_t n = daytona_debug::RecordHook(daytona_debug::HookId::kVdSwapCaller, ctx);
 
     if (ShouldLog(n)) {
@@ -264,6 +271,15 @@ REX_HOOK_RAW(sub_82233C80) {
     }
 
     __imp__sub_82233C80(ctx, base);
+
+    if (REXCVAR_GET(daytona_native_renderer)) {
+        // The guest retires frame buffers on vblank. Own their contents before
+        // returning to the CPU code that can reuse them for the next frame.
+        PPCContext flush = ctx;
+        flush.r3.u64 = device;
+        __imp__sub_82235B20(flush, base);
+        WaitForDaytonaNativeInputs();
+    }
 
     if (ShouldLog(n)) {
         REXLOG_INFO(
@@ -749,7 +765,30 @@ REX_HOOK_RAW(SceneRender) {
     __imp__sub_8212B3C8(ctx, base);
 }
 
-// Scene3dRender (sub_8222CB88): builds the 3D draw list; calls RenderTargetSetup.
+REX_HOOK_RAW(sub_8212B0A8) {
+    const uint32_t target = ctx.r4.u32;
+    __imp__sub_8212B0A8(ctx, base);
+    if (!REXCVAR_GET(daytona_native_renderer) ||
+        !target ||
+        REX_LOAD_U32(target + 176) == 1)
+        return;
+    const auto &edges = daytona::native::kTileEdges;
+    if (REX_LOAD_U32(target + 12) != 1920 || REX_LOAD_U32(target + 16) != 1080 ||
+        REX_LOAD_U32(target + 176) != 7)
+        throw std::runtime_error("Unverified Daytona render target regions");
+    for (uint32_t i = 0; i < 7; ++i) {
+        const uint32_t rect = target + 180 + i * 16;
+        if (REX_LOAD_U32(rect) != 0 || REX_LOAD_U32(rect + 4) != edges[i] ||
+            REX_LOAD_U32(rect + 8) != 1920 || REX_LOAD_U32(rect + 12) != edges[i + 1])
+            throw std::runtime_error("Unverified Daytona tile rectangles");
+    }
+    // One full-frame region removes the game's repeated clears, command-buffer
+    // replays and resolves while retaining its render-target setup and cleanup.
+    REX_STORE_U32(target + 176, 1);
+    REX_STORE_U32(target + 192, 1080);
+}
+
+// D3D EndTiling submits the recorded scene and resolves each region.
 REX_HOOK_RAW(Scene3dRender) {
     uint32_t n = daytona_debug::RecordHook(daytona_debug::HookId::kScene3dRender, ctx);
     const bool log = n <= 5 || (n % 1000) == 0;

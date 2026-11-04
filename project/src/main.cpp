@@ -5,6 +5,7 @@
 #include "daytona_debug.h"
 #include "keyboard_driver.h"
 #include "render_probe.h"
+#include "native_graphics.h"
 
 #include <rex/cvar.h>
 #include <rex/filesystem.h>
@@ -411,7 +412,8 @@ protected:
     }
 
     void OnPreSetup(rex::RuntimeConfig& config) override {
-        config.graphics = CreateDaytonaSdkGraphics();
+        if (auto native = CreateDaytonaNativeGraphics()) config.graphics = std::move(native);
+        else config.graphics = CreateDaytonaSdkGraphics();
         daytona_debug::SetStage(daytona_debug::AppStage::kPreSetup);
         REXCVAR_SET(gpu_allow_invalid_fetch_constants, true);
 

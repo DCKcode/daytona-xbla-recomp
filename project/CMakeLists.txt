@@ -20,8 +20,8 @@ else()
         "Expected path: ${REXGLUE_SDK_SOURCE_DIR}")
 endif()
 
-# The SDK plugin exports only its C entry points. Compile its Vulkan classes
-# into Daytona so the application can select its graphics system directly.
+# The SDK plugin exports only its C entry points. Daytona subclasses its
+# command processor, so compile those same sources into the application.
 get_target_property(_GUEST_GPU_SOURCES rexgpu-xenos SOURCES)
 get_target_property(_GUEST_GPU_SOURCE_DIR rexgpu-xenos SOURCE_DIR)
 list(REMOVE_ITEM _GUEST_GPU_SOURCES plugin_main.cpp)
@@ -59,6 +59,8 @@ add_executable(daytona
     src/keyboard_driver.cpp
     src/daytona_debug.cpp
     src/render_probe.cpp
+    src/native_graphics.cpp
+    src/native_frame_builder.cpp
     ${GENERATED_SOURCES}
 )
 
@@ -147,3 +149,7 @@ target_compile_definitions(daytona_native_renderer PUBLIC VK_NO_PROTOTYPES)
 target_link_libraries(daytona PRIVATE daytona_native_renderer)
 add_executable(daytona_native_frame EXCLUDE_FROM_ALL ../tools/native_frame.cpp)
 target_link_libraries(daytona_native_frame PRIVATE daytona_native_renderer)
+
+add_executable(daytona_native_capture EXCLUDE_FROM_ALL ../tools/native_capture.cpp src/native_frame_builder.cpp)
+target_include_directories(daytona_native_capture PRIVATE "${REXGLUE_SDK_SOURCE_DIR}/thirdparty/glslang")
+target_link_libraries(daytona_native_capture PRIVATE daytona_native_renderer daytona_guest_gpu xxHash::xxhash)
