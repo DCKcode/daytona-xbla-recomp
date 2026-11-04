@@ -36,6 +36,12 @@ target_include_directories(daytona_guest_gpu PRIVATE
 target_link_libraries(daytona_guest_gpu PUBLIC rex::runtime Vulkan::Headers
     PRIVATE $<TARGET_PROPERTY:rexgpu-xenos,LINK_LIBRARIES>)
 
+set(VOLK_PULL_IN_VULKAN OFF)
+add_subdirectory("${CMAKE_SOURCE_DIR}/../thirdparty/volk" volk)
+target_link_libraries(volk PUBLIC Vulkan::Headers)
+# Prevent Volk's function-pointer globals from interposing on the SDK loader.
+set_target_properties(volk PROPERTIES C_VISIBILITY_PRESET hidden)
+
 # Include generated source list from rexglue codegen.
 # On a fresh clone this file doesn't exist yet; create an empty stub so CMake
 # configure succeeds before the first codegen run.
@@ -111,3 +117,33 @@ add_custom_target(daytona_codegen
     COMMENT "Regenerating Daytona codegen with vendored ReXGlue SDK"
     VERBATIM
 )
+
+set(DAYTONA_NATIVE_SHADER_DIR "" CACHE PATH "Translated Daytona SPIR-V directory")
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+if(DAYTONA_NATIVE_SHADER_DIR)
+    if(NOT IS_DIRECTORY "${DAYTONA_NATIVE_SHADER_DIR}")
+        message(FATAL_ERROR "DAYTONA_NATIVE_SHADER_DIR is not a directory: ${DAYTONA_NATIVE_SHADER_DIR}")
+    endif()
+    file(GLOB _NATIVE_SHADER_INPUTS CONFIGURE_DEPENDS "${DAYTONA_NATIVE_SHADER_DIR}/*.spv")
+    foreach(_PRESENT_SHADER present.vs.spv present.ps.spv)
+        if(NOT EXISTS "${DAYTONA_NATIVE_SHADER_DIR}/${_PRESENT_SHADER}")
+            message(FATAL_ERROR "Native shader directory is missing ${_PRESENT_SHADER}")
+        endif()
+    endforeach()
+else()
+    set(_NATIVE_SHADER_INPUTS)
+    message(STATUS "Native shaders are not embedded; set DAYTONA_NATIVE_SHADER_DIR for native rendering")
+endif()
+add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/native_shaders.inc"
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/../tools/embed_native_shaders.py"
+        "${DAYTONA_NATIVE_SHADER_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/native_shaders.inc"
+    DEPENDS "${CMAKE_SOURCE_DIR}/../tools/embed_native_shaders.py" ${_NATIVE_SHADER_INPUTS}
+    VERBATIM)
+add_library(daytona_native_renderer STATIC src/native_renderer.cpp src/native_frame_file.cpp
+    "${CMAKE_CURRENT_BINARY_DIR}/native_shaders.inc")
+target_include_directories(daytona_native_renderer PUBLIC src PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(daytona_native_renderer PUBLIC Vulkan::Headers PRIVATE volk::volk)
+target_compile_definitions(daytona_native_renderer PUBLIC VK_NO_PROTOTYPES)
+target_link_libraries(daytona PRIVATE daytona_native_renderer)
+add_executable(daytona_native_frame EXCLUDE_FROM_ALL ../tools/native_frame.cpp)
+target_link_libraries(daytona_native_frame PRIVATE daytona_native_renderer)
