@@ -7,6 +7,24 @@
     },
     "configurePresets": [
         {
+            "name": "mac-arm64",
+            "displayName": "macOS ARM64",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/out/build/mac-arm64",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_OSX_ARCHITECTURES": "arm64",
+                "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo",
+                "CMAKE_DEFAULT_BUILD_TYPE": "Release"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            }
+        },
+        {
             "name": "linux-amd64",
             "displayName": "Linux AMD64",
             "generator": "Ninja Multi-Config",
@@ -44,6 +62,16 @@
         }
     ],
     "buildPresets": [
+        {
+            "name": "mac-arm64-debug",
+            "configurePreset": "mac-arm64",
+            "configuration": "Debug"
+        },
+        {
+            "name": "mac-arm64-release",
+            "configurePreset": "mac-arm64",
+            "configuration": "Release"
+        },
         {
             "name": "linux-amd64-debug",
             "configurePreset": "linux-amd64",

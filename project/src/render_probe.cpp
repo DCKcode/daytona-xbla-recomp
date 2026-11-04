@@ -111,14 +111,18 @@ protected:
     VulkanCommandProcessor::IssueSwap(address, width, height);
     if (!finished_capture.empty()) {
       WriteReference(finished_capture);
+#if !REX_PLATFORM_MAC
       if (renderdoc_)
         renderdoc_->api_1_0_0()->EndFrameCapture(nullptr, nullptr);
+#endif
     }
+#if !REX_PLATFORM_MAC
     if (start_capture && renderdoc_) {
       const auto path = (capture_ / "sdk").string();
       renderdoc_->api_1_0_0()->SetLogFilePathTemplate(path.c_str());
       renderdoc_->api_1_0_0()->StartFrameCapture(nullptr, nullptr);
     }
+#endif
   }
 
 private:
