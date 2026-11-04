@@ -56,14 +56,19 @@ X_STATUS KeyboardInputDriver::Setup() {
     return X_STATUS_SUCCESS;
 }
 
+void KeyboardInputDriver::EnumerateDevices(std::vector<DeviceInfo>& out) {
+#ifdef _WIN32
+    out.push_back({kDevice, 0, "Daytona keyboard and XInput", "", true});
+#endif
+}
+
 uint16_t KeyboardInputDriver::MapKeyToButton(VirtualKey key) { return 0; }
 void KeyboardInputDriver::OnKeyDown(KeyEvent& e) {}
 void KeyboardInputDriver::OnKeyUp(KeyEvent& e) {}
 
-X_RESULT KeyboardInputDriver::GetCapabilities(uint32_t user_index,
-                                               uint32_t flags,
-                                               X_INPUT_CAPABILITIES* out_caps) {
-    if (user_index != 0) return X_ERROR_DEVICE_NOT_CONNECTED;
+X_RESULT KeyboardInputDriver::GetDeviceCapabilities(
+    rex::input::DeviceId id, uint32_t flags, X_INPUT_CAPABILITIES* out_caps) {
+    if (id != kDevice) return X_ERROR_DEVICE_NOT_CONNECTED;
     if (out_caps) {
         std::memset(out_caps, 0, sizeof(*out_caps));
         out_caps->type = 0x01;
@@ -136,9 +141,9 @@ static void PollKeyboard(uint16_t& buttons, uint8_t& lt, uint8_t& rt) {
 }
 #endif
 
-X_RESULT KeyboardInputDriver::GetState(uint32_t user_index,
-                                        X_INPUT_STATE* out_state) {
-    if (user_index != 0) return X_ERROR_DEVICE_NOT_CONNECTED;
+X_RESULT KeyboardInputDriver::GetDeviceState(rex::input::DeviceId id,
+                                             X_INPUT_STATE* out_state) {
+    if (id != kDevice) return X_ERROR_DEVICE_NOT_CONNECTED;
     if (out_state) {
         uint16_t current = 0;
         uint8_t lt = 0, rt = 0;
@@ -181,14 +186,14 @@ X_RESULT KeyboardInputDriver::GetState(uint32_t user_index,
     return X_ERROR_SUCCESS;
 }
 
-X_RESULT KeyboardInputDriver::SetState(uint32_t user_index,
-                                        X_INPUT_VIBRATION* vibration) {
-    if (user_index != 0) return X_ERROR_DEVICE_NOT_CONNECTED;
+X_RESULT KeyboardInputDriver::SetDeviceVibration(
+    rex::input::DeviceId id, X_INPUT_VIBRATION* vibration) {
+    if (id != kDevice) return X_ERROR_DEVICE_NOT_CONNECTED;
     return X_ERROR_SUCCESS;
 }
 
-X_RESULT KeyboardInputDriver::GetKeystroke(uint32_t user_index, uint32_t flags,
-                                            X_INPUT_KEYSTROKE* out_keystroke) {
-    if (user_index != 0) return X_ERROR_DEVICE_NOT_CONNECTED;
+X_RESULT KeyboardInputDriver::GetDeviceKeystroke(
+    rex::input::DeviceId id, uint32_t flags, X_INPUT_KEYSTROKE* out_keystroke) {
+    if (id != kDevice) return X_ERROR_DEVICE_NOT_CONNECTED;
     return X_ERROR_EMPTY;
 }

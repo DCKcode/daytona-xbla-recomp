@@ -8,6 +8,7 @@
 #include <rex/cvar.h>
 #include <rex/filesystem.h>
 #include <rex/graphics/flags.h>
+#include <rex/graphics/vulkan/graphics_system.h>
 #include <rex/logging/api.h>
 #include <rex/rex_app.h>
 #include <rex/input/input_system.h>
@@ -24,6 +25,8 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+
+REXCVAR_DEFINE_STRING(daytona_state_path, "", "Paths", "Directory for Daytona settings and caches.");
 
 namespace {
 
@@ -398,20 +401,22 @@ public:
 
 protected:
     void OnConfigurePaths(rex::PathConfig& paths) override {
-        const std::filesystem::path exe_dir = rex::filesystem::GetExecutableFolder();
+        const std::filesystem::path exe_dir = REXCVAR_GET(daytona_state_path).empty()
+            ? rex::filesystem::GetExecutableFolder()
+            : std::filesystem::path(REXCVAR_GET(daytona_state_path));
+        std::filesystem::create_directories(exe_dir);
         paths.config_path = exe_dir / "daytona.toml";
         paths.cache_root = exe_dir / "cache";
         ini_settings_ = LoadDaytonaIni(exe_dir, paths);
     }
 
     void OnPreSetup(rex::RuntimeConfig& config) override {
-        (void)config;
+        config.graphics = std::make_unique<rex::graphics::vulkan::VulkanGraphicsSystem>();
         daytona_debug::SetStage(daytona_debug::AppStage::kPreSetup);
         REXCVAR_SET(gpu_allow_invalid_fetch_constants, true);
 
         REXCVAR_SET(vulkan_readback_memexport, true);
         REXCVAR_SET(vulkan_readback_resolve, true);
-        REXCVAR_SET(vulkan_force_dxt45_rgba8_decode, true);
     }
 
     void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {

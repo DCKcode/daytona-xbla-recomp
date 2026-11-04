@@ -35,20 +35,22 @@ public:
     ~KeyboardInputDriver() override;
 
     X_STATUS Setup() override;
+    void EnumerateDevices(std::vector<rex::input::DeviceInfo>& out) override;
 
-    X_RESULT GetCapabilities(uint32_t user_index, uint32_t flags,
-                             X_INPUT_CAPABILITIES* out_caps) override;
-    X_RESULT GetState(uint32_t user_index, X_INPUT_STATE* out_state) override;
-    X_RESULT SetState(uint32_t user_index,
-                      X_INPUT_VIBRATION* vibration) override;
-    X_RESULT GetKeystroke(uint32_t user_index, uint32_t flags,
-                          X_INPUT_KEYSTROKE* out_keystroke) override;
+    X_RESULT GetDeviceCapabilities(rex::input::DeviceId id, uint32_t flags,
+                                   X_INPUT_CAPABILITIES* out_caps) override;
+    X_RESULT GetDeviceState(rex::input::DeviceId id, X_INPUT_STATE* out_state) override;
+    X_RESULT SetDeviceVibration(rex::input::DeviceId id,
+                                 X_INPUT_VIBRATION* vibration) override;
+    X_RESULT GetDeviceKeystroke(rex::input::DeviceId id, uint32_t flags,
+                                X_INPUT_KEYSTROKE* out_keystroke) override;
 
     // WindowInputListener overrides
     void OnKeyDown(rex::ui::KeyEvent& e) override;
     void OnKeyUp(rex::ui::KeyEvent& e) override;
 
 private:
+    static constexpr auto kDevice = static_cast<rex::input::DeviceId>(0x44544B00);
     uint16_t MapKeyToButton(rex::ui::VirtualKey key);
 
     std::atomic<uint16_t> buttons_{0};
