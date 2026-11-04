@@ -21,6 +21,7 @@ public:
                  uint32_t primitive, uint32_t count, bool indexed);
   void CopyGuest(const rex::graphics::RegisterFile &registers);
   Frame Finish();
+  bool has_output_copy() const { return final_copy_; }
   struct WorkCounts {
     uint64_t hashes = 0, decodes = 0;
   };

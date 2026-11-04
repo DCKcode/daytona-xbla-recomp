@@ -200,6 +200,35 @@ void ClearOnly() {
          "A clear-only world must retain binding-zero color and depth");
 }
 
+void OutputCopies() {
+  Fixture f;
+  native::FrameBuilder builder(f.memory.data(), nullptr,
+                               native::SceneInputs::SinglePass);
+  Expect(!builder.has_output_copy(),
+         "A repeated present must not produce a new output frame");
+  const float clear[] = {0, 0, 1, 0, 0, 0, 1,
+                        1920, 0, 1, 0, 0, 0, 1,
+                        1920, 1080, 1, 0, 0, 0, 1};
+  std::memcpy(f.memory.data() + 0x4000, clear, sizeof(clear));
+  auto r = f.Registers();
+  r[0x4800] = 0x4003;
+  r[0x4801] = 21 << 2;
+  r[0x2200] = 0x76;
+  builder.DrawGuest(r, f.clear_vs, f.clear_ps, 8, 3, false);
+  Expect(!builder.has_output_copy(),
+         "Drawing must not replace the displayed buffer before its copy");
+  r[0x2318] = 0x100000;
+  builder.CopyGuest(r);
+  Expect(builder.has_output_copy(),
+         "An intentional clear-only output must be presented");
+  auto frame = builder.Finish();
+  Expect(frame.draws.empty() &&
+             frame.ui_clear.color == std::array<float, 4>{0, 0, 0, 1},
+         "Clear-only output must retain an intentional black image");
+  Expect(!builder.has_output_copy(),
+         "The next swap must reuse output until another copy completes");
+}
+
 void ChangedTiles() {
   Fixture f;
   native::FrameBuilder builder(f.memory.data());
@@ -270,10 +299,11 @@ int main(int argc, char **argv) {
     TextureReuploads();
     Constants();
     ClearOnly();
+    OutputCopies();
     ChangedTiles();
     RejectedArrangements();
     Serialization(argv[1]);
-    std::cout << "7 native frame builder cases passed\n";
+    std::cout << "8 native frame builder cases passed\n";
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';
     return 1;

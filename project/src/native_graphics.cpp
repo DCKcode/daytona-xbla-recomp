@@ -37,6 +37,11 @@ public:
                          rex::system::KernelState *kernel)
       : CommandProcessor(graphics, kernel) {}
   void IssueSwap(uint32_t address, uint32_t width, uint32_t height) override {
+    started_ = true;
+    // The intro sometimes re-presents a buffer without writing new output.
+    // Keep its previous image until the guest copies another completed frame.
+    if (!builder_->has_output_copy())
+      return;
     auto finish_start = profile_ ? std::chrono::steady_clock::now()
                                  : std::chrono::steady_clock::time_point{};
     auto frame = builder_->Finish();
@@ -44,7 +49,6 @@ public:
       finish_ms_ += std::chrono::duration<double, std::milli>(
                         std::chrono::steady_clock::now() - finish_start)
                         .count();
-    started_ = true;
     for (size_t i = 0; i < 256; ++i) {
       const auto &entry = gamma_ramp_256_entry_table()[i];
       frame.gamma[i * 3] = (entry.color_10_red * 255 + 511) / 1023;
