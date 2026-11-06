@@ -3,8 +3,9 @@ import pathlib
 import struct
 import re
 import subprocess
-import os
 import json
+
+from native_shader_tools import build_translator, find_dxc
 
 parser = argparse.ArgumentParser(
     description="Translate captured Daytona shaders using a local XenosRecomp checkout."
@@ -12,6 +13,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("probe", type=pathlib.Path)
 parser.add_argument("output", type=pathlib.Path)
 parser.add_argument("--xenosrecomp", type=pathlib.Path, required=True)
+parser.add_argument("--dxc", type=pathlib.Path, help="Override the native DXC executable")
 args = parser.parse_args()
 root = args.xenosrecomp.resolve()
 probe = args.probe.resolve()
@@ -23,9 +25,6 @@ revision = subprocess.check_output(
 ).strip()
 if revision != expected_revision:
     parser.error(f"Use XenosRecomp revision {expected_revision}; found {revision}.")
-translator = root / "build/XenosRecomp/XenosRecomp"
-if not translator.is_file():
-    parser.error("Build XenosRecomp in its build directory first.")
 
 
 # Captured microcode has no D3D reflection container. These shaders use a
@@ -41,6 +40,11 @@ be = lambda *x: struct.pack(">" + str(len(x)) + "I", *x)
 shader_paths = sorted((*probe.glob("*.vs.bin"), *probe.glob("*.ps.bin")))
 if not shader_paths:
     parser.error("No captured shader microcode found.")
+try:
+    dxc, env = find_dxc(root, args.dxc)
+except ValueError as error:
+    parser.error(str(error))
+translator = build_translator(root, out)
 for path in shader_paths:
     name = path.stem
     vertex = name.endswith(".vs")
@@ -102,11 +106,9 @@ for path in shader_paths:
     virtual = virtual[:4] + be(len(virtual)) + virtual[8:]
     dest = out / (name + ".container")
     dest.write_bytes(virtual + raw)
-    env = os.environ.copy()
-    env["LD_LIBRARY_PATH"] = str(root / "thirdparty/dxc-bin/lib/x64")
     r = subprocess.run(
         [
-            str(root / "build/XenosRecomp/XenosRecomp"),
+            str(translator),
             str(dest),
             str(out / (name + ".hlsl")),
             str(root / "XenosRecomp/shader_common.h"),
@@ -119,8 +121,6 @@ for path in shader_paths:
         raise RuntimeError(r.stderr or r.stdout)
     print("Translated", name)
 
-dxc = root / "thirdparty/dxc-bin/bin/x64/dxc-linux"
-dxc.chmod(0o755)
 for p in out.glob("*.hlsl"):
     if ".ubo." in p.name:
         continue
@@ -228,8 +228,6 @@ float4 nativeTextureSample(float4 value, uint index)
     s = re.sub(r"\bspace([0-4])\b", lambda m: f"space{spaces[int(m[1])]}", s)
     q = p.with_suffix(".ubo.hlsl")
     q.write_text(s)
-    env = os.environ.copy()
-    env["LD_LIBRARY_PATH"] = str(root / "thirdparty/dxc-bin/lib/x64")
     cmd = [
         str(dxc),
         "-T",
