@@ -2,27 +2,57 @@
 
 This project is a static recompilation of Daytona USA (Xbox 360 / XBLA, 2011) using ReXGlue. No copyrighted game files are included.
 
+This is a fork of [Subarasheese/daytona-xbla-recomp](https://github.com/Subarasheese/daytona-xbla-recomp) with the following changes:
+
+* Uses a direct Vulkan renderer with higher efficiency than ReXGlue's included renderer
+  * The game runs at 60 FPS on a Retroid Pocket 5 / Snapdragon 865
+* Uses upstream ReXGlue 0.10.0 instead of a forked ReXGlue
+* Supports Linux ARM64 and macOS ARM64 targets
+* Tested on x86_64 Linux, aarch64 Linux and aarch64 macOS
+  * On macOS, the game works in windowed mode. The MoltenVK version included with ReXGlue 0.10.0 has [an issue that prevents it from starting fullscreen](https://github.com/KhronosGroup/MoltenVK/pull/2722).
+* This fork is untested on Windows, but I expect it to continue to work there as well
+
+All fork additions were made chiefly through GPT Sol 6.1 in Pi, with me supervising direction and orchestrating verification loops.
+
 ## Quick start
 
-Building requires completing every step below in order. Skipping any step will cause the next one to fail.
-
-1. Install [prerequisites](#prerequisites)
+1. Install the [prerequisites](#prerequisites).
 2. Clone with submodules: `git clone --recurse-submodules <this repo>`
-3. Place your game package in `game/` and run `python3 scripts/extract_game.py`
-4. Configure:
-   - Linux: `cmake --preset linux-amd64 -S project`
-   - Windows: `cmake --preset win-amd64 -S project`
-5. Run codegen:
-   - Linux: `cmake --build project/out/build/linux-amd64 --config Release --target daytona_codegen`
-   - Windows: `cmake --build project/out/build/win-amd64 --config Release --target daytona_codegen`
-6. Build:
-   - Linux: `cmake --build project/out/build/linux-amd64 --config Release`
-   - Windows: `cmake --build project/out/build/win-amd64 --config Release`
-7. Run:
-   - Linux: `LD_LIBRARY_PATH="$PWD/thirdparty/rexglue-sdk/out/linux-amd64/Release" project/out/build/linux-amd64/Release/daytona --game_data_root="$PWD/extracted"`
-   - Windows: `project\out\build\win-amd64\Release\daytona.exe --game_data_root=extracted`
+3. Place your game package in `game/` and extract it using the commands below.
+4. Prepare the [native shaders](#native-shaders) in `build/shaders/`. This needs a local shader dump from your own copy of the game. Game extraction and codegen do not generate these files.
+5. Configure, run codegen, build and launch from the repository root.
 
-See the sections below for details on each step and Windows equivalents.
+| Platform | Preset |
+|----------|--------|
+| Linux x86-64 | `linux-amd64` |
+| Linux ARM64 | `linux-arm64` |
+| macOS ARM64 | `mac-arm64` |
+| Windows x86-64 | `win-amd64` |
+
+**Linux and macOS**
+
+Set `daytona_preset` to the appropriate value from the table:
+
+```sh
+daytona_preset=linux-amd64
+python3 scripts/extract_game.py
+cmake --preset "$daytona_preset" -S project -DDAYTONA_NATIVE_SHADER_DIR="$PWD/build/shaders"
+cmake --build "project/out/build/$daytona_preset" --config Release --target daytona_codegen
+cmake --build "project/out/build/$daytona_preset" --config Release
+"project/out/build/$daytona_preset/Release/daytona" --game_data_root="$PWD/extracted"
+```
+
+On macOS, run in windowed mode and add `--mnk_mode=true` for keyboard controls.
+
+**Windows PowerShell**
+
+```powershell
+python scripts/extract_game.py
+cmake --preset win-amd64 -S project "-DDAYTONA_NATIVE_SHADER_DIR=$PWD/build/shaders"
+cmake --build project/out/build/win-amd64 --config Release --target daytona_codegen
+cmake --build project/out/build/win-amd64 --config Release
+.\project\out\build\win-amd64\Release\daytona.exe "--game_data_root=$PWD/extracted"
+```
 
 ## Prerequisites
 
@@ -30,6 +60,7 @@ See the sections below for details on each step and Windows equivalents.
 
 - **CMake 3.25+**
 - **Ninja** build system
+- **Python 3.10+**. On Windows, the examples use `python`; on Linux and macOS, they use `python3`.
 
 ### Windows
 
@@ -44,6 +75,11 @@ See the sections below for details on each step and Windows equivalents.
 - X11/XCB interop library (`libx11-xcb-dev` on Debian/Ubuntu, `libx11` on Arch, `libX11-devel` on Fedora)
 - XWayland or a native X11 session (the SDK renders via XCB; on Wayland, XWayland must be running)
 
+### macOS
+
+- Xcode 16+ or its command-line tools.
+- CMake 3.25+, Ninja, and Python 3: `brew install cmake ninja python`
+
 ## Included
 
 ```text
@@ -54,16 +90,7 @@ scripts/extract_game.py         local STFS package extractor
 thirdparty/rexglue-sdk          required ReXGlue SDK submodule
 ```
 
-The host project sources were copied from the running `daytona_working` tree,
-including:
-
-```text
-project/src/daytona_symbols.h
-project/src/stubs.cpp
-project/src/main.cpp
-```
-
-`project/src/daytona_symbols.h` is the full symbol map from the working version.
+`project/src/daytona_symbols.h` contains the game's symbol map.
 
 ## Required local game files
 
@@ -116,7 +143,7 @@ Microsoft Xbox 360 executable (XA-2845, media ID: 3CA562D4), all regions
 
 ## Required ReXGlue SDK
 
-This recompilation requires the `daytonaxbla` branch of the ReXGlue SDK — **not** the default branch. It is vendored as a git submodule at:
+This recompilation pins unmodified upstream ReXGlue 0.10.0 at commit `f5337cdc947ff6d4c4196737e2c807a48f2a1fc2`. It is included as a git submodule at:
 
 ```text
 thirdparty/rexglue-sdk
@@ -128,157 +155,25 @@ After cloning this repository, initialize it with:
 git submodule update --init --recursive
 ```
 
-If `git submodule status --recursive` prints nothing even though `.gitmodules`
-contains `thirdparty/rexglue-sdk`, the submodule was not recorded in the index.
-Re-add it — the `-b daytonaxbla` flag is required:
+## Native shaders
+
+The renderer embeds translated SPIR-V shaders at build time. `DAYTONA_NATIVE_SHADER_DIR` must point to a directory containing the game's translated `.vs.spv` and `.ps.spv` files, plus `present.vs.spv` and `present.ps.spv`. It does not generate shaders itself.
+
+To regenerate the shaders, you need a local dump of the game's original shader microcode. For each shader, the translator expects `.bin`, `.txt` disassembly and `.json` reflection files with matching names, such as `6433F5B8BCEDF080.vs.bin`, `6433F5B8BCEDF080.vs.txt` and `6433F5B8BCEDF080.vs.json`. The dump must cover the menus and all three tracks. These game-derived files are not included in the repository, and `scripts/extract_game.py` does not produce them.
+
+The script builds a small C++ frontend to the pinned XenosRecomp translator using CMake, Ninja and Clang. This translates the original shader microcode into HLSL without linking the DXC library. The script then runs a native DXC executable to compile the HLSL into SPIR-V.
+
+On Linux x86-64, Windows x86-64 and macOS ARM64, the script selects the DXC binary bundled with XenosRecomp and sets its runtime library path. Linux ARM64 needs an installed native DXC with SPIR-V support. On Ubuntu 26.10, install it with `sudo apt install dxc`. The script finds it on `PATH`; you can also pass `--dxc /path/to/dxc` to select a different native compiler on any platform.
+
+From the repository root, with the shader dump saved in `build/shader-dump/`:
 
 ```sh
-git submodule add -b daytonaxbla https://github.com/Subarasheese/rexglue-sdk.git thirdparty/rexglue-sdk
-git submodule update --init --recursive
+git clone --recurse-submodules https://github.com/hedge-dev/XenosRecomp.git build/XenosRecomp
+git -C build/XenosRecomp checkout 990d03b28a27b50277ee5d8d942e1c5f873869d1
+git -C build/XenosRecomp submodule update --init --recursive
+python3 tools/compile_native_shaders.py build/shader-dump build/shaders --xenosrecomp build/XenosRecomp
 ```
 
-The current submodule checkout used when this tree was prepared is:
+On Windows, use PowerShell and replace `python3` with `python`. Run from a Visual Studio developer shell with Clang and Ninja on `PATH`. On macOS, the script uses Xcode's `clang++`.
 
-```text
-82a88a385c456ccfd82eae2b320955d0f028d92d
-```
-
-CMake may warn that no `v*` tag is reachable from the SDK checkout and fall
-back to `0.8.0.0-dev.unknown`. That warning did not block configure, codegen, or
-the Release build on this tree.
-
-## Regenerate codegen
-
-From the repository root:
-
-**Linux**
-
-```sh
-cmake --preset linux-amd64 -S project
-cmake --build project/out/build/linux-amd64 --config Release --target daytona_codegen
-```
-
-**Windows**
-
-```bat
-cmake --preset win-amd64 -S project
-cmake --build project/out/build/win-amd64 --config Release --target daytona_codegen
-```
-
-That target uses the `rex::rexglue` executable built from `thirdparty/rexglue-sdk`.
-The `generated/` and `config/generated/` directories are local codegen outputs and are intentionally ignored by Git.
-
-## Build
-
-> **Prerequisites:** Complete [Regenerate codegen](#regenerate-codegen) first. The build requires generated headers such as `daytona_init.h` that do not exist in the repository.
-
-Configure and build from the repository root.
-
-**Linux**
-
-```sh
-cmake --preset linux-amd64 -S project
-cmake --build project/out/build/linux-amd64 --config Release
-```
-
-**Windows**
-
-```bat
-cmake --preset win-amd64 -S project
-cmake --build project/out/build/win-amd64 --config Release
-```
-
-Alternatively on either platform, `cd project/` first and run the presets without the `-S` / path overrides:
-
-```sh
-# Linux
-cd project
-cmake --preset linux-amd64
-cmake --build --preset linux-amd64-release
-```
-
-```bat
-rem Windows
-cd project
-cmake --preset win-amd64
-cmake --build --preset win-amd64-release
-```
-
-If configuration fails with a missing SDK message, run:
-
-```sh
-git submodule update --init --recursive
-```
-
-The Daytona target directly compiles SDK sources including `rex_app.cpp`, so it
-needs two SDK include paths in `project/CMakeLists.txt`:
-
-```text
-thirdparty/rexglue-sdk/thirdparty/imgui
-project/out/build/<preset>/rexglue-sdk/include   (linux-amd64 or win-amd64)
-```
-
-Without them, the Release build fails with missing `imgui.h` or
-`rex/version.h`.
-
-## Run
-
-Provide the extracted game directory via `--game_data_root`.
-
-**Linux**
-
-The executable links against SDK shared libraries from the build output. Run it
-with `LD_LIBRARY_PATH`:
-
-```sh
-LD_LIBRARY_PATH="$PWD/thirdparty/rexglue-sdk/out/linux-amd64/Release" \
-  project/out/build/linux-amd64/Release/daytona \
-  --game_data_root="$PWD/extracted"
-```
-
-For a short smoke test that does not leave the process running:
-
-```sh
-mkdir -p logs
-timeout 20 env \
-  DISPLAY=:1 \
-  GDK_BACKEND=x11 \
-  LD_LIBRARY_PATH="$PWD/thirdparty/rexglue-sdk/out/linux-amd64/Release" \
-  project/out/build/linux-amd64/Release/daytona \
-  --game_data_root="$PWD/extracted" \
-  --log_file="$PWD/logs/daytona_run.log" \
-  --log_level=debug
-```
-
-If `LD_LIBRARY_PATH` is omitted, `ldd project/out/build/linux-amd64/Release/daytona`
-shows `librexruntime.so => not found` and `libTracyClient.so => not found`.
-
-**Windows**
-
-The build step automatically copies runtime DLLs next to the executable, so no
-`PATH` changes are needed. Run from the repository root:
-
-```bat
-project\out\build\win-amd64\Release\daytona.exe --game_data_root=extracted
-```
-
-`logs/` and `*.log` are ignored so local runtime logs are not uploaded.
-
-This has been confirmed to build and run from this checkout after building the Release preset.
-During a working run, the log may still print repeated `NtQueryInformationFile(XFileXctdCompressionInformation) unimplemented`
-messages and occasional `Skipping Vulkan frame presentation due to async placeholder draw usage in this frame` warnings.
-
-If `--game_data_root` is omitted, startup exits immediately with:
-
-```text
-[ERROR] --game_data_root was not provided.
-```
-
-## Roadmap
-
-| Feature | Status |
-|---------|--------|
-| Arbitrary resolution support (including ultrawide 21:9 and wider) | Planned |
-| Keyboard control mapping | Planned |
-| Android port | Planned |
-| Native rendering (replace Xbox 360 GPU emulation with a native Vulkan/D3D12 backend) | Planned |
+The script requires that exact XenosRecomp revision and compiles both the game shaders and the present shaders. It builds its translator automatically in the output directory and does not modify XenosRecomp. Keep the dump and generated shaders local, alongside your extracted game files.
