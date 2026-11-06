@@ -44,6 +44,23 @@
             }
         },
         {
+            "name": "linux-arm64",
+            "displayName": "Linux ARM64",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/out/build/linux-arm64",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo",
+                "CMAKE_DEFAULT_BUILD_TYPE": "Release"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
             "name": "win-amd64",
             "displayName": "Windows AMD64",
             "generator": "Ninja Multi-Config",
@@ -80,6 +97,16 @@
         {
             "name": "linux-amd64-release",
             "configurePreset": "linux-amd64",
+            "configuration": "Release"
+        },
+        {
+            "name": "linux-arm64-debug",
+            "configurePreset": "linux-arm64",
+            "configuration": "Debug"
+        },
+        {
+            "name": "linux-arm64-release",
+            "configurePreset": "linux-arm64",
             "configuration": "Release"
         },
         {
